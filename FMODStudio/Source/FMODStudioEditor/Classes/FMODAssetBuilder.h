@@ -3,6 +3,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include <iostream>
+#include <vector>
 
 namespace FMOD
 {
@@ -29,6 +31,7 @@ public:
 
     /** Path of strings bank */
     FString GetMasterStringsBankPath();
+
 
 private:
     struct AssetCreateInfo

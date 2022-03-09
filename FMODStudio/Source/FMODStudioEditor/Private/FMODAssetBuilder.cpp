@@ -1,5 +1,8 @@
 #include "FMODAssetBuilder.h"
 
+#include <iostream>
+#include <map>
+
 #include "AssetRegistryModule.h"
 #include "FMODAssetLookup.h"
 #include "FMODAssetTable.h"
@@ -581,6 +584,23 @@ UFMODAsset *FFMODAssetBuilder::CreateAsset(const AssetCreateInfo& CreateInfo, TA
     return Asset;
 }
 
+bool FindRecursive(const FString& StartDirectory, TArray<FString>& FoundFilenames, const FString& FileExtension /*= TEXT("")*/, bool bFindFiles /*= true*/, bool bFindDirectories /*= false*/)
+{
+    const bool bClearFilenameArray = true;
+    FString Wildcard = FileExtension;
+    if (Wildcard.IsEmpty())
+    {
+        Wildcard = TEXT("*.*");
+    }
+    IFileManager::Get().FindFilesRecursive(FoundFilenames, *StartDirectory, *Wildcard, bFindFiles, bFindDirectories, bClearFilenameArray);
+    return FoundFilenames.Num() > 0;
+}
+
+void RevertFMODFiles(TArray<FString> input) 
+{
+    SourceControlHelpers::RevertFiles(input, true);
+}
+
 void FFMODAssetBuilder::SaveAssets(TArray<UObject*>& AssetsToSave)
 {
     if (AssetsToSave.Num() == 0)
@@ -601,7 +621,26 @@ void FFMODAssetBuilder::SaveAssets(TArray<UObject*>& AssetsToSave)
         }
     }
 
-    UEditorLoadingAndSavingUtils::SavePackages(PackagesToSave, true);
+    bool success = UEditorLoadingAndSavingUtils::SavePackages(PackagesToSave, true);
+
+    if (success) {
+
+        std::map<FString, TArray<FString>> FMODMap;
+
+        TArray<FString> SearchList;
+        FMODMap.insert({ "Content/FMOD/Banks", SearchList });
+        FMODMap.insert({ "Content/FMOD/Buses", SearchList });
+        FMODMap.insert({ "Content/FMOD/Events", SearchList });
+        FMODMap.insert({ "Content/FMOD/PrivateIntegrationData", SearchList });
+        FMODMap.insert({ "Content/FMOD/Reverbs", SearchList });
+        FMODMap.insert({ "Content/FMOD/Snapshots", SearchList });
+        FMODMap.insert({ "Content/FMOD/VCAs", SearchList });
+
+        for (auto list : FMODMap) {
+            FindRecursive(FPaths::ProjectDir() + list.first, list.second, TEXT(""), true, true);
+            RevertFMODFiles(list.second);
+        }
+    }
 }
 
 void FFMODAssetBuilder::DeleteAssets(TArray<UObject*>& AssetsToDelete)
